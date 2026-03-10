@@ -1,0 +1,20 @@
+[package]
+name = "cde-wallpaper"
+version = "0.1.0"
+edition = "2021"
+
+[[example]]
+name = "render_test"
+path = "examples/render_test.rs"
+
+[[example]]
+name = "dbus_test"
+path = "examples/dbus_test.rs"
+
+[dependencies]
+gtk4 = { version = "0.9", features = ["v4_12"] }
+zbus = { version = "5", features = ["blocking"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+image = { version = "0.25", default-features = false, features = ["png"] }
+anyhow = "1"
