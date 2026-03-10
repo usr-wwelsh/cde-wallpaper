@@ -251,10 +251,19 @@ pub fn build_window(app: &Application) {
             render(data, fg, bg, out_w, out_h, scale)
         };
 
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
+        let out_dir = format!("{}/.local/share/cde-wallpaper", home);
+        let _ = std::fs::create_dir_all(&out_dir);
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs()).unwrap_or(0);
-        let tmp_path = format!("/tmp/cde-wallpaper-{}.png", ts);
+        let tmp_path = format!("{}/wallpaper-{}.png", out_dir, ts);
+        // Remove old wallpaper files so the dir doesn't grow unbounded
+        if let Ok(entries) = std::fs::read_dir(&out_dir) {
+            for entry in entries.flatten() {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
         if let Err(e) = img.save(&tmp_path) { eprintln!("Failed to save PNG: {}", e); return; }
         if let Err(e) = set_kde_wallpaper(&tmp_path) { eprintln!("KDE DBus error: {}", e); }
 
