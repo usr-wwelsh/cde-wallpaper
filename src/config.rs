@@ -3,18 +3,21 @@ use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
-    pub wallpaper_dir: String,
+    pub wallpaper_dir: Option<String>,
     pub selected_file: Option<String>,
+    pub selected_is_embedded: bool,
+    pub hide_defaults: bool,
     pub fg_color: [u8; 3],
     pub bg_color: [u8; 3],
 }
 
 impl Default for Config {
     fn default() -> Self {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
         Config {
-            wallpaper_dir: format!("{}/Documents/cdewallpapers/raw", home),
+            wallpaper_dir: None,
             selected_file: None,
+            selected_is_embedded: false,
+            hide_defaults: false,
             fg_color: [43, 80, 115],
             bg_color: [148, 148, 148],
         }

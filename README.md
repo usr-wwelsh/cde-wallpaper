@@ -1,5 +1,7 @@
 # cde-wallpaper
 
+![Demo](demo.png)
+
 A Rust/GTK4 wallpaper picker for Wayland that reads authentic CDE (Common Desktop Environment) wallpaper files (`.xbm`, `.xpm`) and applies them via KDE Plasma's D-Bus API.
 
 ## Features
@@ -16,7 +18,7 @@ A Rust/GTK4 wallpaper picker for Wayland that reads authentic CDE (Common Deskto
 - Wayland compositor (tested on KDE Plasma 6)
 - GTK 4.12+
 - D-Bus session (for KDE wallpaper apply)
-- CDE wallpaper files (`.xbm` / `.xpm`) — not included
+- CDE wallpaper files (`.xbm` / `.xpm`) — default set included (see below)
 
 ## Dependencies
 
@@ -40,7 +42,7 @@ cargo build --release
 cargo run --release
 ```
 
-Point the file browser at a directory containing CDE wallpaper files (`.bm`, `.xbm`, `.pm`, `.xpm`). Select a wallpaper, choose foreground/background colors from the CDE palette or a custom color picker, preview it, then click **Apply**.
+A default set of CDE wallpapers is embedded in the binary and shown on startup. Optionally click **Add folder…** to include your own wallpaper directory (files appear above the built-in defaults). Use the **Hide defaults** checkbox to hide the embedded set. Select a wallpaper, choose foreground/background colors from the CDE palette or a custom color picker, preview it, then click **Apply**.
 
 ## How It Works
 
@@ -52,6 +54,12 @@ Point the file browser at a directory containing CDE wallpaper files (`.bm`, `.x
 ## CDE Palettes
 
 The built-in palette list mirrors the original CDE palette set (Broica, Cactus, Default, Desert, EarthTones, Galactic, GrassyMeadow, Ivory, Maple, Monsoon, Ocean, Pumpkin, Sandstone, Slate, Spring, Sulphur, Sunshine, Tropical, Tundra, Wheat).
+
+## Bundled Wallpapers
+
+The default wallpaper files embedded in this binary (`.bm`, `.xbm`, `.pm`, `.xpm` files in `assets/wallpapers/`) originate from the **Common Desktop Environment (CDE)**, which is open-source software licensed under the **GNU Lesser General Public License v2 (LGPL-2)**. These files were not created by the author of this project. Source: [CDE on SourceForge](https://sourceforge.net/projects/cdesktopenv/).
+
+The color palettes are also derived from CDE and are not original works of this project's author.
 
 ## License
 

@@ -18,3 +18,4 @@ serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 image = { version = "0.25", default-features = false, features = ["png"] }
 anyhow = "1"
+rust-embed = "8"

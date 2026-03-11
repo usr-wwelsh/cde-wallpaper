@@ -23,6 +23,14 @@ pub fn parse_file(path: &Path) -> Result<WallpaperData> {
     }
 }
 
+pub fn parse_str(source: &str, ext: &str) -> Result<WallpaperData> {
+    match ext {
+        "bm" | "xbm" => Ok(WallpaperData::Xbm(xbm::parse(source)?)),
+        "pm" | "xpm" => Ok(WallpaperData::Xpm(xpm::parse(source)?)),
+        _ => bail!("unknown extension: {}", ext),
+    }
+}
+
 /// Files to skip in the browser (solid color utilities, not real wallpapers)
 pub fn is_skip_file(name: &str) -> bool {
     matches!(name, "Background.bm" | "Foreground.bm")

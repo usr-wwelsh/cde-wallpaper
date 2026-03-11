@@ -72,22 +72,49 @@ pub fn populate_flow(
             .content_height(28)
             .build();
 
-        da.set_draw_func(move |_, cr, _, _| {
+        let state_draw = Rc::clone(&state);
+        da.set_draw_func(move |_, cr, w, h| {
+            // Fill with swatch color
             cr.set_source_rgb(
                 color[0] as f64 / 255.0,
                 color[1] as f64 / 255.0,
                 color[2] as f64 / 255.0,
             );
             let _ = cr.paint();
+
+            // Draw selection box if this color is currently selected
+            let s = state_draw.borrow();
+            let selected = if set_fg { s.config.fg_color } else { s.config.bg_color };
+            if selected == color {
+                // White outer ring
+                cr.set_source_rgb(1.0, 1.0, 1.0);
+                cr.set_line_width(2.0);
+                cr.rectangle(1.0, 1.0, (w - 2) as f64, (h - 2) as f64);
+                let _ = cr.stroke();
+                // Black inner ring for contrast on light colors
+                cr.set_source_rgb(0.0, 0.0, 0.0);
+                cr.set_line_width(1.0);
+                cr.rectangle(3.0, 3.0, (w - 6) as f64, (h - 6) as f64);
+                let _ = cr.stroke();
+            }
         });
 
         let gesture = GestureClick::new();
         let state_c = Rc::clone(&state);
         let on_change_c = Rc::clone(&on_change);
+        let flow_c = flow.clone();
         gesture.connect_pressed(move |_, _, _, _| {
             {
                 let mut s = state_c.borrow_mut();
                 if set_fg { s.config.fg_color = color; } else { s.config.bg_color = color; }
+            }
+            // queue_draw on FlowBox doesn't propagate to DrawingArea children in GTK4;
+            // iterate each FlowBoxChild and redraw its inner widget directly
+            let mut idx = 0;
+            loop {
+                let Some(fbc) = flow_c.child_at_index(idx) else { break };
+                if let Some(da) = fbc.child() { da.queue_draw(); }
+                idx += 1;
             }
             on_change_c();
         });

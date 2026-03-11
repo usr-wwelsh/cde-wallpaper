@@ -8,16 +8,17 @@ use std::rc::Rc;
 
 use gtk4::prelude::*;
 use gtk4::{
-    Application, ApplicationWindow, Box as GtkBox, Button, ColorDialogButton,
+    Application, ApplicationWindow, Box as GtkBox, Button, CheckButton, ColorDialogButton,
     DropDown, FileDialog, Label, Orientation, Separator, StringList,
 };
 
+use cde_wallpaper::assets::DefaultWallpapers;
 use cde_wallpaper::config::Config;
 use cde_wallpaper::kde::set_kde_wallpaper;
-use cde_wallpaper::parser::{is_scale_file, parse_file, WallpaperData};
+use cde_wallpaper::parser::{is_scale_file, parse_file, parse_str, WallpaperData};
 use cde_wallpaper::renderer::render;
 
-use crate::gui::file_list::{build_file_list, populate_list, row_filename, select_by_name};
+use crate::gui::file_list::{build_file_list, is_embedded_row, populate_list, row_filename, select_by_name};
 use crate::gui::palette::{build_palette, get_palette_colors, populate_flow, CDE_PALETTES};
 use crate::gui::preview::{build_preview, update_preview};
 
@@ -25,6 +26,7 @@ pub struct AppState {
     pub config: Config,
     pub current_data: Option<WallpaperData>,
     pub current_name: Option<String>,
+    pub current_is_embedded: bool,
 }
 
 pub fn build_window(app: &Application) {
@@ -33,6 +35,7 @@ pub fn build_window(app: &Application) {
     let state = Rc::new(RefCell::new(AppState {
         current_data: None,
         current_name: config.selected_file.clone(),
+        current_is_embedded: config.selected_is_embedded,
         config,
     }));
 
@@ -65,8 +68,15 @@ pub fn build_window(app: &Application) {
         .build();
 
     let wallpaper_dir = state.borrow().config.wallpaper_dir.clone();
-    let (scroll, file_list) = build_file_list(&wallpaper_dir);
+    let hide_defaults = state.borrow().config.hide_defaults;
+    let (scroll, file_list) = build_file_list(wallpaper_dir.as_deref(), hide_defaults);
     left.append(&scroll);
+
+    // "Hide defaults" checkbox
+    let hide_chk = CheckButton::with_label("Hide defaults");
+    hide_chk.set_active(hide_defaults);
+    left.append(&hide_chk);
+
     left.append(&Separator::new(Orientation::Horizontal));
 
     // Palette dropdown
@@ -181,7 +191,7 @@ pub fn build_window(app: &Application) {
         .orientation(Orientation::Horizontal)
         .spacing(8)
         .build();
-    let browse_btn = Button::with_label("Browse…");
+    let browse_btn = Button::with_label("Add folder…");
     let apply_btn  = Button::with_label("Apply");
     bottom_bar.append(&browse_btn);
     bottom_bar.append(&apply_btn);
@@ -199,19 +209,48 @@ pub fn build_window(app: &Application) {
     file_list.connect_row_selected(move |_, row| {
         let Some(row)  = row else { return };
         let Some(name) = row_filename(row) else { return };
-        let dir = state_list.borrow().config.wallpaper_dir.clone();
-        let path = Path::new(&dir).join(&name);
-        match parse_file(&path) {
+
+        let data = if is_embedded_row(row) {
+            let ext = Path::new(&name)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+            match DefaultWallpapers::get(&name) {
+                Some(file) => match std::str::from_utf8(file.data.as_ref()) {
+                    Ok(source) => parse_str(source, &ext),
+                    Err(e) => { eprintln!("UTF-8 error for {}: {}", name, e); return; }
+                },
+                None => { eprintln!("Embedded file not found: {}", name); return; }
+            }
+        } else {
+            let dir = state_list.borrow().config.wallpaper_dir.clone().unwrap_or_default();
+            parse_file(&Path::new(&dir).join(&name))
+        };
+
+        let embedded = is_embedded_row(row);
+        match data {
             Ok(data) => {
                 {
                     let mut s = state_list.borrow_mut();
                     s.current_data = Some(data);
                     s.current_name = Some(name);
+                    s.current_is_embedded = embedded;
                 }
                 update_preview(&picture_list, &state_list.borrow());
             }
-            Err(e) => eprintln!("Error parsing {:?}: {}", path, e),
+            Err(e) => eprintln!("Error parsing {}: {}", name, e),
         }
+    });
+
+    // ── Hide defaults checkbox signal ─────────────────────────────────────────
+    let state_chk = Rc::clone(&state);
+    let list_chk  = file_list.clone();
+    hide_chk.connect_toggled(move |chk| {
+        let hide = chk.is_active();
+        state_chk.borrow_mut().config.hide_defaults = hide;
+        let dir = state_chk.borrow().config.wallpaper_dir.clone();
+        populate_list(&list_chk, dir.as_deref(), hide);
     });
 
     // ── Browse button ─────────────────────────────────────────────────────────
@@ -226,8 +265,9 @@ pub fn build_window(app: &Application) {
             if let Ok(file) = result {
                 if let Some(path) = file.path() {
                     let dir = path.to_string_lossy().to_string();
-                    state_cb.borrow_mut().config.wallpaper_dir = dir.clone();
-                    populate_list(&list_cb, &dir);
+                    state_cb.borrow_mut().config.wallpaper_dir = Some(dir.clone());
+                    let hide = state_cb.borrow().config.hide_defaults;
+                    populate_list(&list_cb, Some(&dir), hide);
                 }
             }
         });
@@ -258,7 +298,6 @@ pub fn build_window(app: &Application) {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs()).unwrap_or(0);
         let tmp_path = format!("{}/wallpaper-{}.png", out_dir, ts);
-        // Remove old wallpaper files so the dir doesn't grow unbounded
         if let Ok(entries) = std::fs::read_dir(&out_dir) {
             for entry in entries.flatten() {
                 let _ = std::fs::remove_file(entry.path());
@@ -269,18 +308,35 @@ pub fn build_window(app: &Application) {
 
         let mut s = state_apply.borrow_mut();
         s.config.selected_file = name_opt;
+        s.config.selected_is_embedded = s.current_is_embedded;
         s.config.save();
     });
 
     // ── Restore last selection ────────────────────────────────────────────────
-    // Extract from state first so the Ref is dropped before any borrow_mut below
-    let (restore_name, restore_dir) = {
+    let (restore_name, restore_dir, restore_embedded) = {
         let s = state.borrow();
-        (s.config.selected_file.clone(), s.config.wallpaper_dir.clone())
+        (
+            s.config.selected_file.clone(),
+            s.config.wallpaper_dir.clone(),
+            s.config.selected_is_embedded,
+        )
     };
     if let Some(name) = restore_name {
-        let path = Path::new(&restore_dir).join(&name);
-        if let Ok(data) = parse_file(&path) {
+        let data = if restore_embedded {
+            let ext = Path::new(&name)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+            DefaultWallpapers::get(&name)
+                .and_then(|f| std::str::from_utf8(f.data.as_ref()).ok().map(|s| s.to_string()))
+                .and_then(|src| parse_str(&src, &ext).ok())
+        } else {
+            let dir = restore_dir.unwrap_or_default();
+            parse_file(&Path::new(&dir).join(&name)).ok()
+        };
+
+        if let Some(data) = data {
             {
                 let mut s = state.borrow_mut();
                 s.current_data = Some(data);
@@ -288,7 +344,7 @@ pub fn build_window(app: &Application) {
             }
             update_preview(&picture, &state.borrow());
         }
-        select_by_name(&file_list, &name);
+        select_by_name(&file_list, &name, restore_embedded);
     }
 
     window.present();
