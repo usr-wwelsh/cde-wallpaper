@@ -1,0 +1,15 @@
+cde-wallpaper
+Copyright (c) 2026 usr-wwelsh
+Licensed under the MIT License. See LICENSE for details.
+
+---
+
+This project includes the following third-party works:
+
+CDE Default Wallpapers
+  Source:  Common Desktop Environment (CDE)
+           https://sourceforge.net/projects/cdesktopenv/
+  Files:   assets/wallpapers/ (*.bm, *.xbm, *.pm, *.xpm)
+  License: Creative Commons Attribution-ShareAlike 3.0 Unported (CC BY-SA 3.0)
+           https://creativecommons.org/licenses/by-sa/3.0/
+  Note:    These files were not created by the author of this project.

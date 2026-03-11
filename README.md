@@ -57,7 +57,7 @@ The built-in palette list mirrors the original CDE palette set (Broica, Cactus, 
 
 ## Bundled Wallpapers
 
-The default wallpaper files embedded in this binary (`.bm`, `.xbm`, `.pm`, `.xpm` files in `assets/wallpapers/`) originate from the **Common Desktop Environment (CDE)**, which is open-source software licensed under the **GNU Lesser General Public License v2 (LGPL-2)**. These files were not created by the author of this project. Source: [CDE on SourceForge](https://sourceforge.net/projects/cdesktopenv/).
+The default wallpaper files embedded in this binary (`.bm`, `.xbm`, `.pm`, `.xpm` files in `assets/wallpapers/`) originate from the **Common Desktop Environment (CDE)** and are licensed under the **Creative Commons Attribution-ShareAlike 3.0 (CC BY-SA 3.0)** license. These files were not created by the author of this project. Source: [CDE on SourceForge](https://sourceforge.net/projects/cdesktopenv/).
 
 The color palettes are also derived from CDE and are not original works of this project's author.
 
