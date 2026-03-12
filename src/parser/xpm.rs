@@ -66,7 +66,7 @@ pub fn parse(source: &str) -> Result<XpmData> {
 }
 
 /// Extract all doubly-quoted string literals from the source.
-/// Handles C escape sequences: \\ → \, \" → ", \n → newline, etc.
+/// XPM pixel/color data uses literal bytes — no escape sequences are processed.
 fn extract_quoted_strings(source: &str) -> Vec<String> {
     let mut strings = Vec::new();
     let bytes = source.as_bytes();
@@ -76,22 +76,7 @@ fn extract_quoted_strings(source: &str) -> Vec<String> {
             i += 1;
             let mut s = String::new();
             while i < bytes.len() && bytes[i] != b'"' {
-                if bytes[i] == b'\\' && i + 1 < bytes.len() {
-                    i += 1;
-                    match bytes[i] {
-                        b'\\' => s.push('\\'),
-                        b'"' => s.push('"'),
-                        b'n' => s.push('\n'),
-                        b't' => s.push('\t'),
-                        b'r' => s.push('\r'),
-                        other => {
-                            s.push('\\');
-                            s.push(other as char);
-                        }
-                    }
-                } else {
-                    s.push(bytes[i] as char);
-                }
+                s.push(bytes[i] as char);
                 i += 1;
             }
             if i < bytes.len() {
