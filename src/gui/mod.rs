@@ -6,6 +6,7 @@ use std::cell::RefCell;
 use std::path::Path;
 use std::rc::Rc;
 
+use gtk4::glib;
 use gtk4::prelude::*;
 use gtk4::{
     Application, ApplicationWindow, Box as GtkBox, Button, CheckButton, ColorDialogButton,
@@ -273,44 +274,62 @@ pub fn build_window(app: &Application) {
         });
     });
 
-    // ── Apply button ─────────────────────────────────────────────────────────
-    let state_apply  = Rc::clone(&state);
-    let window_apply = window.clone();
-    apply_btn.connect_clicked(move |_| {
-        let (has_data, fg, bg, name_opt) = {
-            let s = state_apply.borrow();
-            (s.current_data.is_some(), s.config.fg_color, s.config.bg_color, s.current_name.clone())
-        };
-        if !has_data { return; }
+    // ── Apply logic (shared by button and Enter key) ──────────────────────────
+    let apply_fn: Rc<dyn Fn()> = Rc::new({
+        let state  = Rc::clone(&state);
+        let window = window.clone();
+        move || {
+            let (has_data, fg, bg, name_opt) = {
+                let s = state.borrow();
+                (s.current_data.is_some(), s.config.fg_color, s.config.bg_color, s.current_name.clone())
+            };
+            if !has_data { return; }
 
-        let (out_w, out_h) = get_screen_size(&window_apply);
-        let img = {
-            let s     = state_apply.borrow();
-            let data  = s.current_data.as_ref().unwrap();
-            let scale = is_scale_file(name_opt.as_deref().unwrap_or(""));
-            render(data, fg, bg, out_w, out_h, scale)
-        };
+            let (out_w, out_h) = get_screen_size(&window);
+            let img = {
+                let s     = state.borrow();
+                let data  = s.current_data.as_ref().unwrap();
+                let scale = is_scale_file(name_opt.as_deref().unwrap_or(""));
+                render(data, fg, bg, out_w, out_h, scale)
+            };
 
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
-        let out_dir = format!("{}/.local/share/cde-wallpaper", home);
-        let _ = std::fs::create_dir_all(&out_dir);
-        let ts = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs()).unwrap_or(0);
-        let tmp_path = format!("{}/wallpaper-{}.png", out_dir, ts);
-        if let Ok(entries) = std::fs::read_dir(&out_dir) {
-            for entry in entries.flatten() {
-                let _ = std::fs::remove_file(entry.path());
+            let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
+            let out_dir = format!("{}/.local/share/cde-wallpaper", home);
+            let _ = std::fs::create_dir_all(&out_dir);
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs()).unwrap_or(0);
+            let tmp_path = format!("{}/wallpaper-{}.png", out_dir, ts);
+            if let Ok(entries) = std::fs::read_dir(&out_dir) {
+                for entry in entries.flatten() {
+                    let _ = std::fs::remove_file(entry.path());
+                }
             }
-        }
-        if let Err(e) = img.save(&tmp_path) { eprintln!("Failed to save PNG: {}", e); return; }
-        if let Err(e) = set_kde_wallpaper(&tmp_path) { eprintln!("KDE DBus error: {}", e); }
+            if let Err(e) = img.save(&tmp_path) { eprintln!("Failed to save PNG: {}", e); return; }
+            if let Err(e) = set_kde_wallpaper(&tmp_path) { eprintln!("KDE DBus error: {}", e); }
 
-        let mut s = state_apply.borrow_mut();
-        s.config.selected_file = name_opt;
-        s.config.selected_is_embedded = s.current_is_embedded;
-        s.config.save();
+            let mut s = state.borrow_mut();
+            s.config.selected_file = name_opt;
+            s.config.selected_is_embedded = s.current_is_embedded;
+            s.config.save();
+        }
     });
+
+    // ── Apply button ─────────────────────────────────────────────────────────
+    let apply_fn_btn = Rc::clone(&apply_fn);
+    apply_btn.connect_clicked(move |_| apply_fn_btn());
+
+    // ── Enter key on file list applies the wallpaper ──────────────────────────
+    let key_ctrl = gtk4::EventControllerKey::new();
+    let apply_fn_key = Rc::clone(&apply_fn);
+    key_ctrl.connect_key_pressed(move |_, key, _, _| {
+        if key == gtk4::gdk::Key::Return || key == gtk4::gdk::Key::KP_Enter {
+            apply_fn_key();
+            return glib::Propagation::Stop;
+        }
+        glib::Propagation::Proceed
+    });
+    file_list.add_controller(key_ctrl);
 
     // ── Restore last selection ────────────────────────────────────────────────
     let (restore_name, restore_dir, restore_embedded) = {
