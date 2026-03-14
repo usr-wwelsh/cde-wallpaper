@@ -128,6 +128,10 @@ pub fn build_window(app: &Application) {
     });
     left.append(&cd_fg);
 
+    // Swap FG/BG button
+    let swap_btn = Button::with_label("⇅ Swap");
+    left.append(&swap_btn);
+
     // BG palette
     left.append(
         &Label::builder()
@@ -159,6 +163,28 @@ pub fn build_window(app: &Application) {
         update_cd_bg();
     });
     left.append(&cd_bg);
+
+    // ── Swap button signal ────────────────────────────────────────────────────
+    {
+        let state_swap = Rc::clone(&state);
+        let cd_fg_swap = cd_fg.clone();
+        let cd_bg_swap = cd_bg.clone();
+        let update_swap = Rc::clone(&update_fn);
+        swap_btn.connect_clicked(move |_| {
+            let (new_fg, new_bg) = {
+                let mut s = state_swap.borrow_mut();
+                let tmp = s.config.fg_color;
+                s.config.fg_color = s.config.bg_color;
+                s.config.bg_color = tmp;
+                (s.config.fg_color, s.config.bg_color)
+            };
+            let [r, g, b] = new_fg;
+            cd_fg_swap.set_rgba(&gtk4::gdk::RGBA::new(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, 1.0));
+            let [r, g, b] = new_bg;
+            cd_bg_swap.set_rgba(&gtk4::gdk::RGBA::new(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, 1.0));
+            update_swap();
+        });
+    }
 
     // ── Palette dropdown signal ───────────────────────────────────────────────
     let fg_flow_dd = fg_flow.clone();
