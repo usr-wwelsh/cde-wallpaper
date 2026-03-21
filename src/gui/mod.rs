@@ -15,6 +15,7 @@ use gtk4::{
 
 use cde_wallpaper::assets::DefaultWallpapers;
 use cde_wallpaper::config::Config;
+use cde_wallpaper::hyprland::set_hyprland_wallpaper;
 use cde_wallpaper::kde::set_kde_wallpaper;
 use cde_wallpaper::parser::{is_scale_file, parse_file, parse_str, WallpaperData};
 use cde_wallpaper::renderer::render;
@@ -332,7 +333,13 @@ pub fn build_window(app: &Application) {
                 }
             }
             if let Err(e) = img.save(&tmp_path) { eprintln!("Failed to save PNG: {}", e); return; }
-            if let Err(e) = set_kde_wallpaper(&tmp_path) { eprintln!("KDE DBus error: {}", e); }
+            if std::env::var("HYPRLAND_INSTANCE_SIGNATURE").is_ok() {
+                if let Err(e) = set_hyprland_wallpaper(&tmp_path) {
+                    eprintln!("Hyprland wallpaper error: {}", e);
+                }
+            } else if let Err(e) = set_kde_wallpaper(&tmp_path) {
+                eprintln!("KDE DBus error: {}", e);
+            }
 
             let mut s = state.borrow_mut();
             s.config.selected_file = name_opt;
