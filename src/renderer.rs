@@ -11,7 +11,7 @@ pub fn render(
 ) -> RgbaImage {
     match data {
         WallpaperData::Xbm(xbm) => render_xbm(xbm, fg, bg, out_w, out_h),
-        WallpaperData::Xpm(xpm) => render_xpm(xpm, out_w, out_h, scale),
+        WallpaperData::Xpm(xpm) => render_xpm(xpm, fg, bg, out_w, out_h, scale),
     }
 }
 
@@ -27,11 +27,24 @@ fn render_xbm(xbm: &XbmData, fg: [u8; 3], bg: [u8; 3], out_w: u32, out_h: u32) -
     tile(&src, out_w, out_h)
 }
 
-fn render_xpm(xpm: &XpmData, out_w: u32, out_h: u32, scale: bool) -> RgbaImage {
+fn render_xpm(xpm: &XpmData, fg: [u8; 3], bg: [u8; 3], out_w: u32, out_h: u32, scale: bool) -> RgbaImage {
+    // Remap symbolic (theme-driven) colors to fg/bg-derived shades
+    let color_override: std::collections::HashMap<char, [u8; 3]> = xpm.symbolic_symbols.iter()
+        .map(|(&sym, name)| (sym, symbolic_to_theme_color(name, fg, bg)))
+        .collect();
+
     let mut src = RgbaImage::new(xpm.width, xpm.height);
     for y in 0..xpm.height {
         for x in 0..xpm.width {
-            let c = xpm.pixel_color(x, y);
+            let c = if let Some(row) = xpm.pixels.get(y as usize) {
+                if let Some(&sym) = row.get(x as usize) {
+                    if let Some(&oc) = color_override.get(&sym) {
+                        oc
+                    } else {
+                        xpm.colors.get(&sym).copied().unwrap_or([128, 128, 128])
+                    }
+                } else { [128, 128, 128] }
+            } else { [128, 128, 128] };
             src.put_pixel(x, y, Rgba([c[0], c[1], c[2], 255]));
         }
     }
@@ -40,6 +53,27 @@ fn render_xpm(xpm: &XpmData, out_w: u32, out_h: u32, scale: bool) -> RgbaImage {
     } else {
         tile(&src, out_w, out_h)
     }
+}
+
+/// Map a CDE symbolic color name to a theme color derived from fg/bg.
+fn symbolic_to_theme_color(name: &str, fg: [u8; 3], bg: [u8; 3]) -> [u8; 3] {
+    match name {
+        "background"        => bg,
+        "foreground"        => fg,
+        "topShadowColor"    => blend(bg, [255, 255, 255], 0.30),
+        "selectColor"       => blend(bg, [0, 0, 0], 0.20),
+        "bottomShadowColor" => blend(bg, [0, 0, 0], 0.35),
+        _                   => bg,
+    }
+}
+
+/// Blend `a` toward `b` by `t` (0.0 = all a, 1.0 = all b).
+fn blend(a: [u8; 3], b: [u8; 3], t: f32) -> [u8; 3] {
+    [
+        (a[0] as f32 + (b[0] as f32 - a[0] as f32) * t) as u8,
+        (a[1] as f32 + (b[1] as f32 - a[1] as f32) * t) as u8,
+        (a[2] as f32 + (b[2] as f32 - a[2] as f32) * t) as u8,
+    ]
 }
 
 fn tile(src: &RgbaImage, out_w: u32, out_h: u32) -> RgbaImage {

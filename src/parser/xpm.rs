@@ -6,6 +6,9 @@ pub struct XpmData {
     pub height: u32,
     pub pixels: Vec<Vec<char>>,  // pixels[y][x] = symbol char
     pub colors: HashMap<char, [u8; 3]>,
+    /// Symbols whose color came from a CDE symbolic name (no explicit `c` value).
+    /// Value is the symbolic name (e.g. "background", "topShadowColor").
+    pub symbolic_symbols: HashMap<char, String>,
 }
 
 pub fn parse(source: &str) -> Result<XpmData> {
@@ -35,6 +38,7 @@ pub fn parse(source: &str) -> Result<XpmData> {
     }
 
     let mut colors = HashMap::new();
+    let mut symbolic_symbols = HashMap::new();
     for i in 0..ncolors {
         let entry = &strings[1 + i];
         if entry.is_empty() {
@@ -42,8 +46,11 @@ pub fn parse(source: &str) -> Result<XpmData> {
         }
         let symbol = entry.chars().next().unwrap();
         let rest = &entry[1..].trim().to_string();
-        let color = parse_color_entry(rest);
+        let (color, sym_name) = parse_color_entry_with_sym(rest);
         colors.insert(symbol, color);
+        if let Some(name) = sym_name {
+            symbolic_symbols.insert(symbol, name);
+        }
     }
 
     // Remaining height strings: pixel rows
@@ -62,7 +69,7 @@ pub fn parse(source: &str) -> Result<XpmData> {
         pixels.push(row);
     }
 
-    Ok(XpmData { width, height, pixels, colors })
+    Ok(XpmData { width, height, pixels, colors, symbolic_symbols })
 }
 
 /// Extract all doubly-quoted string literals from the source.
@@ -95,7 +102,9 @@ fn extract_quoted_strings(source: &str) -> Vec<String> {
 /// Entry format (after the 1-char symbol): key value [key value ...]
 /// Keys: s (symbolic), m (mono), c (color), g (grey), g4 (4-level grey)
 /// Prefer c; fall back to m; fall back to symbolic name mapping.
-fn parse_color_entry(rest: &str) -> [u8; 3] {
+/// Returns (color, symbolic_name) where symbolic_name is Some only when no
+/// explicit `c`/`m` color exists (i.e. the color is purely theme-driven).
+fn parse_color_entry_with_sym(rest: &str) -> ([u8; 3], Option<String>) {
     let tokens: Vec<&str> = rest.split_whitespace().collect();
     let mut c_value: Option<&str> = None;
     let mut m_value: Option<&str> = None;
@@ -112,18 +121,19 @@ fn parse_color_entry(rest: &str) -> [u8; 3] {
         }
     }
 
+    // Always record symbolic name when present — `c` is the non-CDE fallback, not the primary.
+    let sym_name = s_value.map(|s| s.to_string());
+
     if let Some(v) = c_value {
-        return parse_color_value(v);
+        return (parse_color_value(v), sym_name);
     }
     if let Some(v) = m_value {
-        let parsed = parse_color_value(v);
-        // If the mono value is meaningful (not a fallback grey), use it
-        return parsed;
+        return (parse_color_value(v), sym_name);
     }
     if let Some(sym) = s_value {
-        return symbolic_color(sym);
+        return (symbolic_color(sym), Some(sym.to_string()));
     }
-    [128, 128, 128]
+    ([128, 128, 128], None)
 }
 
 fn symbolic_color(name: &str) -> [u8; 3] {
