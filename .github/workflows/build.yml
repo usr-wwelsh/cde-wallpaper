@@ -1,0 +1,79 @@
+name: Build
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libdbus-1-dev \
+            pkg-config
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Build
+        run: cargo build --release --bin cde-wallpaper
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cde-wallpaper-linux-x86_64
+          path: target/release/cde-wallpaper
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV=$(git tag --sort=-version:refname | grep -v "^${{ github.ref_name }}$" | head -1)
+          if [ -n "$PREV" ]; then
+            LOG=$(git log "$PREV".."${{ github.ref_name }}" --oneline --no-decorate)
+          else
+            LOG=$(git log "${{ github.ref_name }}" --oneline --no-decorate)
+          fi
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          echo "$LOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cde-wallpaper-linux-x86_64
+
+      - name: Make executable
+        run: chmod +x cde-wallpaper
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: cde-wallpaper
+          body: ${{ steps.changelog.outputs.CHANGELOG }}
