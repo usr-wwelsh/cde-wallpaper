@@ -9,6 +9,7 @@ pub struct Config {
     pub hide_defaults: bool,
     pub fg_color: [u8; 3],
     pub bg_color: [u8; 3],
+    pub scale_factor: f32,
 }
 
 impl Default for Config {
@@ -20,6 +21,7 @@ impl Default for Config {
             hide_defaults: false,
             fg_color: [43, 80, 115],
             bg_color: [148, 148, 148],
+            scale_factor: 1.0,
         }
     }
 }

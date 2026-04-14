@@ -8,7 +8,7 @@ use cde_wallpaper::renderer::{render, to_memory_texture};
 pub fn update_preview(picture: &Picture, state: &AppState) {
     if let Some(data) = &state.current_data {
         let scale = is_scale_file(state.current_name.as_deref().unwrap_or(""));
-        let img = render(data, state.config.fg_color, state.config.bg_color, 400, 225, scale);
+        let img = render(data, state.config.fg_color, state.config.bg_color, 400, 225, scale, state.config.scale_factor);
         let texture = to_memory_texture(&img);
         picture.set_paintable(Some(&texture));
     } else {

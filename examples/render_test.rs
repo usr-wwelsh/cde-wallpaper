@@ -7,7 +7,7 @@ fn main() -> anyhow::Result<()> {
         let data = cde_wallpaper::parser::parse_file(path)?;
         let fg = [43u8, 80, 115];
         let bg = [148u8, 148, 148];
-        let img = cde_wallpaper::renderer::render(&data, fg, bg, 800, 600, false);
+        let img = cde_wallpaper::renderer::render(&data, fg, bg, 800, 600, false, 1.0);
         img.save("/tmp/brickwall_test.png")?;
         println!("Saved /tmp/brickwall_test.png");
     }
@@ -18,9 +18,9 @@ fn main() -> anyhow::Result<()> {
         let data = cde_wallpaper::parser::parse_file(path)?;
 
         // Render with grey bg (default-ish)
-        let img_grey = cde_wallpaper::renderer::render(&data, [0u8,0,0], [148u8,148,148], 50, 50, false);
+        let img_grey = cde_wallpaper::renderer::render(&data, [0u8,0,0], [148u8,148,148], 50, 50, false, 1.0);
         // Render with bright red bg
-        let img_red  = cde_wallpaper::renderer::render(&data, [0u8,0,0], [255u8,0,0],     50, 50, false);
+        let img_red  = cde_wallpaper::renderer::render(&data, [0u8,0,0], [255u8,0,0],     50, 50, false, 1.0);
 
         let p_grey = img_grey.get_pixel(0, 0);
         let p_red  = img_red.get_pixel(0, 0);

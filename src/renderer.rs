@@ -8,15 +8,15 @@ pub fn render(
     out_w: u32,
     out_h: u32,
     scale: bool,
+    scale_factor: f32,
 ) -> RgbaImage {
     match data {
-        WallpaperData::Xbm(xbm) => render_xbm(xbm, fg, bg, out_w, out_h),
-        WallpaperData::Xpm(xpm) => render_xpm(xpm, fg, bg, out_w, out_h, scale),
+        WallpaperData::Xbm(xbm) => render_xbm(xbm, fg, bg, out_w, out_h, scale_factor),
+        WallpaperData::Xpm(xpm) => render_xpm(xpm, fg, bg, out_w, out_h, scale, scale_factor),
     }
 }
 
-fn render_xbm(xbm: &XbmData, fg: [u8; 3], bg: [u8; 3], out_w: u32, out_h: u32) -> RgbaImage {
-    // First render the native-size image
+fn render_xbm(xbm: &XbmData, fg: [u8; 3], bg: [u8; 3], out_w: u32, out_h: u32, scale_factor: f32) -> RgbaImage {
     let mut src = RgbaImage::new(xbm.width, xbm.height);
     for y in 0..xbm.height {
         for x in 0..xbm.width {
@@ -24,10 +24,24 @@ fn render_xbm(xbm: &XbmData, fg: [u8; 3], bg: [u8; 3], out_w: u32, out_h: u32) -
             src.put_pixel(x, y, Rgba([color[0], color[1], color[2], 255]));
         }
     }
+    let src = apply_scale_factor(src, scale_factor, out_w, out_h);
     tile(&src, out_w, out_h)
 }
 
-fn render_xpm(xpm: &XpmData, fg: [u8; 3], bg: [u8; 3], out_w: u32, out_h: u32, scale: bool) -> RgbaImage {
+fn apply_scale_factor(src: RgbaImage, factor: f32, max_w: u32, max_h: u32) -> RgbaImage {
+    if (factor - 1.0).abs() < 0.001 {
+        return src;
+    }
+    let new_w = ((src.width() as f32 * factor).round() as u32)
+        .max(1)
+        .min(max_w);
+    let new_h = ((src.height() as f32 * factor).round() as u32)
+        .max(1)
+        .min(max_h);
+    imageops::resize(&src, new_w, new_h, imageops::FilterType::Nearest)
+}
+
+fn render_xpm(xpm: &XpmData, fg: [u8; 3], bg: [u8; 3], out_w: u32, out_h: u32, scale: bool, scale_factor: f32) -> RgbaImage {
     // Remap symbolic (theme-driven) colors to fg/bg-derived shades
     let color_override: std::collections::HashMap<char, [u8; 3]> = xpm.symbolic_symbols.iter()
         .map(|(&sym, name)| (sym, symbolic_to_theme_color(name, fg, bg)))
@@ -48,6 +62,7 @@ fn render_xpm(xpm: &XpmData, fg: [u8; 3], bg: [u8; 3], out_w: u32, out_h: u32, s
             src.put_pixel(x, y, Rgba([c[0], c[1], c[2], 255]));
         }
     }
+    let src = apply_scale_factor(src, scale_factor, out_w, out_h);
     if scale {
         imageops::resize(&src, out_w, out_h, imageops::FilterType::Lanczos3)
     } else {

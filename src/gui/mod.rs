@@ -9,8 +9,9 @@ use std::rc::Rc;
 use gtk4::glib;
 use gtk4::prelude::*;
 use gtk4::{
-    Application, ApplicationWindow, Box as GtkBox, Button, CheckButton, ColorDialogButton,
-    DropDown, FileDialog, Label, Orientation, Separator, StringList,
+    Adjustment, Application, ApplicationWindow, Box as GtkBox, Button, CheckButton,
+    ColorDialogButton, DropDown, FileDialog, Label, Orientation, Separator, SpinButton,
+    StringList,
 };
 
 use cde_wallpaper::assets::DefaultWallpapers;
@@ -133,6 +134,22 @@ pub fn build_window(app: &Application) {
     let swap_btn = Button::with_label("⇅ Swap");
     left.append(&swap_btn);
 
+    // Scale factor
+    let scale_row = GtkBox::builder()
+        .orientation(Orientation::Horizontal)
+        .spacing(6)
+        .margin_top(4)
+        .build();
+    scale_row.append(&Label::builder().label("Scale:").build());
+    let scale_adj = Adjustment::new(
+        state.borrow().config.scale_factor as f64,
+        0.01, 5.00, 0.01, 0.10, 0.0,
+    );
+    let scale_spin = SpinButton::new(Some(&scale_adj), 0.01, 2);
+    scale_spin.set_hexpand(true);
+    scale_row.append(&scale_spin);
+    left.append(&scale_row);
+
     // BG palette
     left.append(
         &Label::builder()
@@ -184,6 +201,16 @@ pub fn build_window(app: &Application) {
             let [r, g, b] = new_bg;
             cd_bg_swap.set_rgba(&gtk4::gdk::RGBA::new(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, 1.0));
             update_swap();
+        });
+    }
+
+    // ── Scale factor signal ───────────────────────────────────────────────────
+    {
+        let state_scale = Rc::clone(&state);
+        let update_scale = Rc::clone(&update_fn);
+        scale_spin.connect_value_changed(move |spin| {
+            state_scale.borrow_mut().config.scale_factor = spin.value() as f32;
+            update_scale();
         });
     }
 
@@ -306,9 +333,9 @@ pub fn build_window(app: &Application) {
         let state  = Rc::clone(&state);
         let window = window.clone();
         move || {
-            let (has_data, fg, bg, name_opt) = {
+            let (has_data, fg, bg, name_opt, scale_factor) = {
                 let s = state.borrow();
-                (s.current_data.is_some(), s.config.fg_color, s.config.bg_color, s.current_name.clone())
+                (s.current_data.is_some(), s.config.fg_color, s.config.bg_color, s.current_name.clone(), s.config.scale_factor)
             };
             if !has_data { return; }
 
@@ -317,7 +344,7 @@ pub fn build_window(app: &Application) {
                 let s     = state.borrow();
                 let data  = s.current_data.as_ref().unwrap();
                 let scale = is_scale_file(name_opt.as_deref().unwrap_or(""));
-                render(data, fg, bg, out_w, out_h, scale)
+                render(data, fg, bg, out_w, out_h, scale, scale_factor)
             };
 
             let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
