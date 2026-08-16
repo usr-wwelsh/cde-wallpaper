@@ -1,5 +1,7 @@
 # cde-wallpaper
 
+[![Read about the commits](https://img.shields.io/badge/commits-code%20blog-1a1a1a?style=flat-square)](https://wwel.sh/digest.html?repo=cde-wallpaper)
+
 ![Demo](demo.png)
 
 A Rust/GTK4 wallpaper picker for Wayland that reads authentic CDE (Common Desktop Environment) wallpaper files (`.xbm`, `.xpm`) and applies them via KDE Plasma's D-Bus API or Hyprland's `hyprctl`/`swww`/`awww`.
